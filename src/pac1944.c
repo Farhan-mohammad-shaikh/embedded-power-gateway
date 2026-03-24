@@ -1,117 +1,62 @@
-#include <stdio.h>
-#include <unistd.h>
+#include <errno.h>
 #include <fcntl.h>
-#include <sys/ioctl.h>
 #include <linux/i2c-dev.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/ioctl.h>
+#include <unistd.h>
 
-#include "app_config.h"
 #include "pac1944.h"
 
-static int pac_read_reg(int fd, uint8_t reg, uint8_t *buf, size_t len)
+int open_i2c_device(const char *device)
 {
-    if (write(fd, &reg, 1) != 1) {
-        perror("i2c write reg addr");
-        return -1;
-    }
-
-    if (read(fd, buf, len) != (ssize_t)len) {
-        perror("i2c read reg data");
-        return -1;
-    }
-
-    return 0;
+    return open(device, O_RDWR);
 }
 
-int pac_open(const char *dev)
+void close_i2c_device(int fd)
 {
-    return open(dev, O_RDWR);
+    close(fd);
 }
 
-void pac_close(int fd)
+int i2c_set_slave(int fd, uint8_t addr)
 {
-    if (fd >= 0) {
-        close(fd);
-    }
-}
-
-int pac_set_slave(int fd, uint8_t addr)
-{
-    if (ioctl(fd, I2C_SLAVE, addr) < 0) {
-        perror("ioctl(I2C_SLAVE)");
+    if (ioctl(fd, I2C_SLAVE, addr) < 0)
+    {
+        fprintf(stderr, "I2C_SLAVE 0x%02X failed: %s\n", addr, strerror(errno));
         return -1;
     }
-
     return 0;
 }
 
 int pac_refresh_g(int fd)
 {
-    uint8_t reg = REG_REFRESH_G;
-
-    if (write(fd, &reg, 1) != 1) {
-        perror("pac_refresh_g");
+    if (i2c_set_slave(fd, 0x00) != 0)
         return -1;
-    }
 
+    uint8_t cmd = 0x1E;
+    if (write(fd, &cmd, 1) != 1)
+    {
+        fprintf(stderr, "REFRESH_G write failed: %s\n", strerror(errno));
+        return -2;
+    }
     return 0;
 }
 
-int pac_read_channel1(int fd,uint8_t addr,uint16_t *vbus,uint16_t *vsense, uint32_t *vpower)
+int pac_read_reg(int fd, uint8_t reg, uint8_t *buf, size_t len)
 {
-    uint8_t raw[2];
-    uint8_t pow[4];
-
-    if (pac_set_slave(fd, addr) != 0) {
+    if (write(fd, &reg, 1) != 1)
+    {
+        fprintf(stderr, "Write reg 0x%02X failed: %s\n", reg, strerror(errno));
         return -1;
     }
 
-    if (pac_read_reg(fd, REG_VBUS1, raw, 2) != 0) {
-        return -1;
+    int r = read(fd, buf, len);
+    if (r != (int)len)
+    {
+        fprintf(stderr, "Read reg 0x%02X failed: got %d/%zu (%s)\n",
+                reg, r, len, strerror(errno));
+        return -2;
     }
-    *vbus = ((uint16_t)raw[0] << 8) | raw[1];
-
-    if (pac_read_reg(fd, REG_VSENSE1, raw, 2) != 0) {
-        return -1;
-    }
-    *vsense = ((uint16_t)raw[0] << 8) | raw[1];
-
-    if (pac_read_reg(fd, REG_VPOWER1, pow, 4) != 0) {
-        return -1;
-    }
-    *vpower = ((uint32_t)pow[0] << 24) |
-              ((uint32_t)pow[1] << 16) |
-              ((uint32_t)pow[2] << 8)  |
-               (uint32_t)pow[3];
-
-    return 0;
-}
-
-int pac_read_channel3(int fd,uint8_t addr,uint16_t *vbus,uint16_t *vsense,uint32_t *vpower)
-{
-    uint8_t raw[2];
-    uint8_t pow[4];
-
-    if (pac_set_slave(fd, addr) != 0) {
-        return -1;
-    }
-
-    if (pac_read_reg(fd, REG_VBUS3, raw, 2) != 0) {
-        return -1;
-    }
-    *vbus = ((uint16_t)raw[0] << 8) | raw[1];
-
-    if (pac_read_reg(fd, REG_VSENSE3, raw, 2) != 0) {
-        return -1;
-    }
-    *vsense = ((uint16_t)raw[0] << 8) | raw[1];
-
-    if (pac_read_reg(fd, REG_VPOWER3, pow, 4) != 0) {
-        return -1;
-    }
-    *vpower = ((uint32_t)pow[0] << 24) |
-              ((uint32_t)pow[1] << 16) |
-              ((uint32_t)pow[2] << 8)  |
-               (uint32_t)pow[3];
-
     return 0;
 }

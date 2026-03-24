@@ -1,27 +1,12 @@
 #include <stdio.h>
-#include <stdarg.h>
 #include "logger.h"
 
-void log_info(const char *fmt, ...)
+void log_info(const char *msg)
 {
-    va_list args;
-
-    va_start(args, fmt);
-    printf("[INFO] ");
-    vprintf(fmt, args);
-    printf("\n");
-    fflush(stdout);
-    va_end(args);
+    printf("%s\n", msg);
 }
 
-void log_error(const char *fmt, ...)
+void log_error(const char *msg)
 {
-    va_list args;
-
-    va_start(args, fmt);
-    fprintf(stderr, "[ERROR] ");
-    vfprintf(stderr, fmt, args);
-    fprintf(stderr, "\n");
-    fflush(stderr);
-    va_end(args);
+    fprintf(stderr, "%s\n", msg);
 }

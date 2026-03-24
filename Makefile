@@ -2,7 +2,7 @@ CC = gcc
 CFLAGS = -Wall -Wextra -Iinclude -pthread
 LDFLAGS = -lmosquitto -pthread
 
-SRC = src/main.c src/pac1944.c src/mqtt_client.c src/led_ctrl.c src/app_config.c src/logger.c
+SRC = src/main.c src/app_config.c src/led_ctrl.c src/mqtt_client.c src/pac1944.c src/logger.c
 OBJ = $(SRC:.c=.o)
 
 TARGET = power-gateway
@@ -14,10 +14,8 @@ $(TARGET): $(OBJ)
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
-
-install:
-	mkdir -p $(DESTDIR)/usr/bin
-	cp $(TARGET) $(DESTDIR)/usr/bin/
+run: all
+	sudo ./power-gateway
 
 clean:
 	rm -f $(OBJ) $(TARGET)
