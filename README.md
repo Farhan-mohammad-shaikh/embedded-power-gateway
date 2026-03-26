@@ -219,14 +219,8 @@ This required debugging of missing device nodes and integration at OS level.
 
 ---
 
-## 8. Limitations and Future Work
+## 8. Future Work
 
-* No persistent energy accumulation yet
-* Static configuration (can be moved to runtime config)
-* Limited fault recovery strategy
-* No secure MQTT (TLS) integration
-
-Planned improvements:
 
 * dynamic configuration via MQTT
 * enhanced error handling and retry logic
@@ -238,6 +232,6 @@ Planned improvements:
 ## 9. Author
 
 Farhan Mohammad Shaikh
-Master’s Student – Microelectronics and Embedded Systems
+
 
 ---
