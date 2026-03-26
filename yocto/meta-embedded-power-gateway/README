@@ -4,3 +4,8 @@ Yocto Integration
 - Custom layer: yocto/meta-embedded-power-gateway
 - Machine: raspberrypi5
 - Application recipe: power-gateway.bb
+
+
+source oe-init-build-env
+bitbake power-gateway
+bitbake core-image-minimal
