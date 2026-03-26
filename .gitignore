@@ -1,0 +1,20 @@
+# Build outputs
+*.o
+power-gateway
+
+# Yocto build artifacts
+build/
+tmp/
+downloads/
+sstate-cache/
+
+# Image artifacts
+*.wic
+*.wic.bz2
+*.ext3
+*.tar.bz2
+*.bmap
+
+# Editor / OS
+.vscode/
+.DS_Store
