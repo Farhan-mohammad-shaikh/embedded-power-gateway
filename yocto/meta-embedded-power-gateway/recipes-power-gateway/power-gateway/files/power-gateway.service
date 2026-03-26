@@ -1,0 +1,19 @@
+[Unit]
+Description=Power Gateway Service
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/power-gateway
+Restart=always
+RestartSec=2
+
+# Optional but recommended
+StandardOutput=journal
+StandardError=journal
+
+# Run as root (needed for I2C & sysfs)
+User=root
+
+[Install]
+WantedBy=multi-user.target

@@ -1,6 +1,6 @@
 # Build outputs
 *.o
-power-gateway
+/power-gateway
 
 # Yocto build artifacts
 build/
