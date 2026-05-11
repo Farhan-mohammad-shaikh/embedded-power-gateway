@@ -1,0 +1,38 @@
+/dts-v1/;
+/plugin/;
+
+/ {
+    compatible = "brcm,bcm2712";
+
+    fragment@0 {
+        target = <&i2c1>;
+
+        __overlay__ {
+            status = "okay";
+
+            pac1944@10 {
+                compatible = "microchip,pac1944-custom";
+                reg = <0x10>;
+                microchip,channel = <1>;
+                shunt-resistor-micro-ohms = <10000>;
+                status = "okay";
+            };
+
+            pac1944@11 {
+                compatible = "microchip,pac1944-custom";
+                reg = <0x11>;
+                microchip,channel = <1>;
+                shunt-resistor-micro-ohms = <10000>;
+                status = "okay";
+            };
+
+            pac1944@12 {
+                compatible = "microchip,pac1944-custom";
+                reg = <0x12>;
+                microchip,channel = <3>;
+                shunt-resistor-micro-ohms = <10000>;
+                status = "okay";
+            };
+        };
+    };
+};

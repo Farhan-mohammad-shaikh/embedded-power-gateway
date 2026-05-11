@@ -36,7 +36,8 @@ do_install() {
 
 inherit systemd
 
-DEPENDS = "mosquitto"
+DEPENDS = "mosquitto systemd"
 
 SYSTEMD_SERVICE:${PN} = "power-gateway.service"
 SYSTEMD_AUTO_ENABLE = "enable"
+EXTRA_OEMAKE += "LDFLAGS='${LDFLAGS}' LDLIBS='-lmosquitto -lsystemd -pthread'"

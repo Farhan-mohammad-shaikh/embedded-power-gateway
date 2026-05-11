@@ -1,11 +1,75 @@
-Yocto Integration
-- Base: Poky kirkstone
-- BSP: meta-raspberrypi
-- Custom layer: yocto/meta-embedded-power-gateway
-- Machine: raspberrypi5
-- Application recipe: power-gateway.bb
+meta-embedded-power-gateway
+===========================
 
+Custom Yocto layer for an Embedded Linux power monitoring gateway on Raspberry Pi.
 
-source oe-init-build-env
-bitbake power-gateway
-bitbake core-image-minimal
+This project demonstrates a complete embedded Linux workflow:
+
+- Custom Yocto layer integration
+- C-based power gateway application
+- systemd service integration
+- MQTT telemetry publishing
+- PAC1944 power monitor integration
+- Custom Linux kernel module for PAC1944
+- Raspberry Pi target deployment
+
+Current Architecture
+====================
+
+Raspberry Pi
+    |
+    |-- PAC1944 power monitor over I2C
+    |
+    |-- Custom kernel module: pac1944-driver
+    |
+    |-- Userspace gateway app: power-gateway
+    |
+    |-- MQTT telemetry output
+
+Layer Structure
+===============
+
+conf/
+    Yocto layer configuration
+
+recipes-kernel/pac1944-driver/
+    PAC1944 Linux kernel module recipe and source
+
+recipes-power-gateway/power-gateway/
+    C userspace application, systemd service, config file, and Yocto recipe
+
+Build Integration
+=================
+
+Add this layer to your Yocto build:
+
+    bitbake-layers add-layer ../meta-embedded-power-gateway
+
+Add packages to the image:
+
+    IMAGE_INSTALL:append = " power-gateway pac1944-driver"
+
+Build the image:
+
+    bitbake core-image-minimal
+
+Runtime Checks
+==============
+
+Check the service:
+
+    systemctl status power-gateway
+
+Check logs:
+
+    journalctl -u power-gateway -f
+
+Check kernel module:
+
+    lsmod | grep pac1944
+    dmesg | grep pac1944
+
+Project Goal
+============
+
+The goal of this project is to build a production-style Embedded Linux gateway that combines Yocto image customization, kernel driver development, Device Tree integration, systemd service management, and MQTT-based telemetry.

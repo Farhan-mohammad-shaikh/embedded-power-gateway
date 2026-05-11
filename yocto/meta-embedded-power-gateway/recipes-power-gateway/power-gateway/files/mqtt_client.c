@@ -90,7 +90,6 @@ struct mosquitto *mqtt_init(const char *host, int port)
 }
 
 void publish_channel_json(struct mosquitto *mosq,
-                          uint8_t i2c_addr,
                           int channel,
                           uint16_t vbus_raw,
                           uint16_t vsense_raw,
@@ -106,7 +105,7 @@ void publish_channel_json(struct mosquitto *mosq,
     double power_w = pwr_fsr * ((double)vpower_code / 1073741824.0);
 
     snprintf(payload, sizeof(payload),
-        "{\"i2c_addr\":\"0x%02X\","
+       "{"
         "\"channel\":%d,"
         "\"vbus_raw\":%u,"
         "\"vsense_raw\":%u,"
@@ -115,7 +114,6 @@ void publish_channel_json(struct mosquitto *mosq,
         "\"current_A\":%.6f,"
         "\"power_W\":%.6f"
         "}",
-        i2c_addr,
         channel,
         (unsigned)vbus_raw,
         (unsigned)vsense_raw,
