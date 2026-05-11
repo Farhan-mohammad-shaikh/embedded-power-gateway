@@ -1,22 +1,27 @@
 # Embedded Power Gateway
 
-Custom Yocto-Based Embedded Linux System for Multi-Rail Power Monitoring and Control
+Custom Yocto-Based Embedded Linux System for Real-Time Multi-Rail Power Monitoring using Raspberry Pi, Linux Kernel Driver Development, Device Tree Integration, and MQTT Telemetry.
 
 ---
 
 ## 1. Introduction
 
-This project implements a complete embedded Linux system for real-time power monitoring and control using Raspberry Pi and Microchip PAC194x power monitoring ICs.
+This project implements a production-style Embedded Linux power monitoring gateway built on Raspberry Pi 5 using the Yocto Project.
 
-The system is designed to acquire electrical parameters (voltage, current, power) across multiple rails, publish telemetry over MQTT, and accept remote control commands. It is built and deployed using a custom Yocto Linux image, with the application integrated as a system service.
+The system performs real-time acquisition of electrical parameters from multiple Microchip PAC1944 power monitoring ICs connected over I²C. Sensor telemetry is processed inside a custom Linux userspace application and published over MQTT for remote monitoring and control.
 
-The work focuses on full-stack embedded development:
+The project demonstrates a complete Embedded Linux workflow including:
 
-* hardware interfacing over I²C
-* low-level data acquisition and scaling
-* multi-threaded application design
-* Linux system integration (systemd)
-* Yocto-based OS customization and deployment
+* Yocto Linux image customization
+* Linux kernel module development
+* Device Tree Overlay integration
+* sysfs-based kernel/userspace communication
+* systemd service management
+* MQTT telemetry infrastructure
+* Embedded C application development
+* Raspberry Pi BSP integration
+
+The focus of this work is not only application development, but complete Linux-based embedded system integration from hardware bring-up to deployment.
 
 ---
 
@@ -24,41 +29,42 @@ The work focuses on full-stack embedded development:
 
 ### 2.1 Functional Overview
 
-```id="w3t6na"
+```text
                   +------------------------+
                   |     MQTT Broker        |
                   |   (External System)    |
                   +-----------+------------+
                               |
-                              | MQTT (Pub/Sub)
+                              | MQTT
                               |
 +-----------------------------v-----------------------------+
-|                Raspberry Pi (Yocto Linux)                |
+|                Raspberry Pi 5 (Yocto Linux)              |
 |----------------------------------------------------------|
-| User Space                                               |
-|  - power-gateway (C application)                         |
-|  - systemd service                                       |
+| Userspace                                                |
+|  - power-gateway application                             |
+|  - MQTT communication (libmosquitto)                    |
+|  - systemd watchdog integration                         |
+|  - LED control subsystem                                |
 |                                                          |
-| Application Components                                   |
-|  - Sensor acquisition (PAC194x over I²C)                 |
-|  - MQTT client (libmosquitto)                            |
-|  - GPIO control (LED)                                    |
-|  - Logging subsystem                                     |
+| Linux Kernel                                             |
+|  - Custom PAC1944 I2C kernel driver                     |
+|  - sysfs interface                                      |
+|  - I2C subsystem                                        |
+|  - Device Tree overlay                                  |
 |                                                          |
-| Kernel Space                                             |
-|  - i2c-dev interface                                     |
-|  - device tree configuration                             |
+| Yocto Integration                                        |
+|  - Custom layer: meta-embedded-power-gateway            |
+|  - BitBake recipes                                      |
+|  - BSP customization                                    |
 +-----------------------------+----------------------------+
                               |
                               | I²C Bus
                               |
         +---------------------+---------------------+
-        |           PAC194x Devices (x3)            |
+        |                 PAC1944 Devices           |
         +---------------------+---------------------+
                               |
-                      Shunt Resistors (1Ω)
-                              |
-                     Power Rails (3.3V / 1.2V / 5V)
+                     Power Rail Measurements
 ```
 
 ---
@@ -66,10 +72,12 @@ The work focuses on full-stack embedded development:
 ## 3. Hardware Design
 
 * Raspberry Pi 5 configured as I²C master
-* Three PAC194x devices for independent rail monitoring
-* 1 Ω precision shunt resistors for current measurement
+* Three PAC1944 power monitoring ICs
+* I²C communication bus
+* Precision shunt resistors
+* Linux-based embedded target platform
 
-Each device monitors a dedicated rail. Measurements are verified against external instrumentation to validate scaling and accuracy.
+The Raspberry Pi acts as the I²C master while the PAC1944 devices perform current, voltage, and power measurements across multiple rails.
 
 ---
 
@@ -77,29 +85,32 @@ Each device monitors a dedicated rail. Measurements are verified against externa
 
 ### 4.1 Application Design
 
-The application is implemented in C with modular separation:
+The userspace gateway application is implemented in C with modular separation:
 
-* `pac1944.c` – low-level I²C register access
-* `mqtt_client.c` – MQTT communication
-* `led_ctrl.c` – GPIO control
-* `logger.c` – logging abstraction
 * `main.c` – system orchestration
+* `pac1944.c` – sysfs sensor access
+* `mqtt_client.c` – MQTT communication
+* `led_ctrl.c` – LED runtime control
+* `logger.c` – logging abstraction
 
 The design follows a multi-threaded model:
 
-* acquisition thread: periodic sensor reads
-* communication thread: MQTT publish/subscribe
-* control thread: handles incoming commands
+* telemetry acquisition
+* MQTT communication
+* LED control handling
+* watchdog servicing
 
-This ensures that telemetry and control paths operate independently without blocking.
+This architecture prevents blocking behavior between telemetry and communication paths.
 
 ---
 
 ### 4.2 Data Acquisition
 
-The PAC194x provides raw ADC values which are converted in software.
+The PAC1944 driver exports raw sensor values through sysfs interfaces.
 
-```id="n2ffh2"
+The userspace application reads these values and converts them into electrical measurements.
+
+```text
 VBUS (V)   = 9.0 × (VBUS_raw / 65536)
 VSENSE (V) = 0.1 × (VSENSE_raw / 65536)
 Current (A)= VSENSE / Rsense
@@ -111,127 +122,216 @@ Where:
 * Rsense = 1 Ω
 * ADC resolution = 16-bit
 
-All conversions are performed explicitly to maintain full control over scaling and precision.
+All conversions are performed explicitly in software to maintain full control over scaling and precision.
 
 ---
 
 ### 4.3 MQTT Communication
 
-Telemetry is published in structured JSON:
+Telemetry is published in structured JSON format:
 
-```id="t6m1b4"
+```json
 {
-  "i2c_addr": "0x10",
   "channel": 1,
-  "vbus_V": 5.01,
-  "vsense_V": 0.0035,
-  "current_A": 0.0035
+  "vbus_raw": 40120,
+  "vsense_raw": 122,
+  "vpower_raw": 412001,
+  "vbus_V": 5.012,
+  "current_A": 0.003,
+  "power_W": 0.015
 }
 ```
 
-Topic structure:
-
-```id="4zh1py"
-<i2c_addr>/ch<channel>
-```
-
-The system also subscribes to control topics for runtime interaction (e.g., LED control).
+The system also subscribes to runtime control topics for external interaction such as LED control commands.
 
 ---
 
-## 5. Embedded Linux Integration
+## 5. Linux Kernel Driver Development
 
-### 5.1 Yocto Configuration
+A custom PAC1944 Linux kernel module was developed for hardware integration.
+
+### 5.1 Driver Features
+
+* I²C client driver implementation
+* Device Tree matching
+* sysfs interface creation
+* automatic driver probing
+* kernel logging using `dev_info()`
+* PAC1944 register acquisition
+
+---
+
+### 5.2 sysfs Interface
+
+The driver exports measurement data through sysfs:
+
+```text
+/sys/bus/i2c/devices/1-0010/vbus_raw
+/sys/bus/i2c/devices/1-0010/vsense_raw
+/sys/bus/i2c/devices/1-0010/vpower_raw
+```
+
+The userspace application accesses sensor data through these kernel interfaces.
+
+This demonstrates a production-style Linux driver architecture:
+
+```text
+Hardware -> Kernel Driver -> sysfs -> Userspace Application
+```
+
+---
+
+## 6. Device Tree Overlay Integration
+
+A custom Device Tree Overlay was implemented to enable PAC1944 devices on the Raspberry Pi I²C bus.
+
+### 6.1 Overlay Features
+
+* I²C bus enablement
+* PAC1944 node registration
+* Device compatibility matching
+* automatic kernel driver probing
+
+### Example Device Tree Node
+
+```dts
+pac1944@10 {
+    compatible = "microchip,pac1944-custom";
+    reg = <0x10>;
+    status = "okay";
+};
+```
+
+The overlay is compiled into a `.dtbo` file during the Yocto build process and automatically loaded during boot.
+
+---
+
+## 7. Embedded Linux Integration
+
+### 7.1 Yocto Configuration
 
 * Base distribution: Poky (Kirkstone)
 * BSP layer: meta-raspberrypi
-* Additional layers: meta-openembedded (networking, mosquitto)
+* Additional layers: meta-openembedded
 * Custom layer: `meta-embedded-power-gateway`
 
 The system is built entirely from source using BitBake.
 
 ---
 
-### 5.2 Application Packaging
+### 7.2 Application Packaging
 
 The application is integrated via a custom BitBake recipe:
 
-```id="qzru1a"
-recipes-power-gateway/power-gateway/power-gateway.bb
+```text
+recipes-power-gateway/power-gateway.bb
 ```
 
 The recipe:
 
-* compiles using Yocto toolchain
+* cross-compiles the application
 * installs binary to `/usr/bin`
 * installs configuration to `/etc/power-gateway`
 * installs systemd unit file
-* enables service at boot
+* enables automatic startup at boot
 
 ---
 
-### 5.3 System Service
+### 7.3 Kernel Driver Recipe
 
-The application runs as a managed systemd service:
+The PAC1944 kernel module is integrated using a dedicated BitBake recipe:
+
+```text
+recipes-kernel/pac1944-driver.bb
+```
+
+The recipe:
+
+* builds external kernel modules
+* installs `.ko` driver module
+* enables automatic module loading at boot
+
+---
+
+### 7.4 Device Tree Overlay Recipe
+
+The PAC1944 Device Tree Overlay is integrated through:
+
+```text
+recipes-bsp/pac1944-overlay.bb
+```
+
+The recipe:
+
+* compiles `.dts` into `.dtbo`
+* deploys overlay into Raspberry Pi boot partition
+* enables overlay loading during boot
+
+---
+
+### 7.5 systemd Service Integration
+
+The application runs as a managed systemd service.
+
+Features include:
 
 * automatic startup
-* controlled restart policy
-* runtime diagnostics via journal
+* restart-on-failure policy
+* watchdog monitoring
+* runtime supervision
+* journal logging
 
-```id="1lgx9m"
+```bash
 systemctl status power-gateway
-journalctl -u power-gateway
+journalctl -u power-gateway -f
 ```
 
 ---
 
-### 5.4 Hardware Enablement
+## 8. Deployment Workflow
 
-I²C support is explicitly enabled in the Yocto image:
-
-* kernel configuration
-* device tree enablement
-* module availability (`i2c-dev`)
-
-This required debugging of missing device nodes and integration at OS level.
-
----
-
-## 6. Deployment Workflow
-
-1. Build image using BitBake
+1. Build Yocto image using BitBake
 2. Generate `.wic` image
-3. Flash to SD card
+3. Flash image to SD card
 4. Boot Raspberry Pi
-5. Verify service and hardware interfaces
-6. Validate telemetry over MQTT
+5. Load Device Tree overlay
+6. Auto-load PAC1944 kernel driver
+7. Start systemd service
+8. Publish telemetry over MQTT
 
 ---
 
-## 7. Key Engineering Aspects
+## 9. Key Engineering Aspects
 
-* Cross-compilation using Yocto toolchain
-* Custom Linux image creation
+* Embedded Linux development
+* Yocto Project integration
+* BitBake recipe development
+* Linux kernel module development
+* Device Tree overlays
+* I²C subsystem integration
+* sysfs driver architecture
+* systemd service management
+* MQTT networking
+* POSIX threading
+* Embedded C programming
+* Raspberry Pi BSP customization
+* Cross-compilation workflows
 * Hardware bring-up and debugging
-* Integration of user-space application with OS services
-* Real-time telemetry pipeline
-* Concurrent processing using multi-threading
 
 ---
 
-## 8. Future Work
+## 10. Future Work
 
-
-* dynamic configuration via MQTT
-* enhanced error handling and retry logic
-* integration with cloud platforms
+* migration to Industrial I/O (IIO) subsystem
+* dynamic runtime configuration
+* improved fault handling and retry logic
+* persistent telemetry logging
+* secure MQTT communication (TLS)
+* cloud dashboard integration
 * performance profiling and optimization
 
 ---
 
-## 9. Author
+## 11. Author
 
 Farhan Mohammad Shaikh
-
-
----
