@@ -1,0 +1,27 @@
+name: Embedded Power Gateway CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y build-essential libmosquitto-dev libsystemd-dev cppcheck
+
+      - name: Build userspace application
+        run: |
+          make clean || true
+          make
+
+      - name: Static analysis
+        run: |
+          cppcheck --enable=warning,style,performance,portability --std=c99 src include
