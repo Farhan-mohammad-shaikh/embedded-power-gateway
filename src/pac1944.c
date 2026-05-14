@@ -1,62 +1,66 @@
 #include <errno.h>
-#include <fcntl.h>
-#include <linux/i2c-dev.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
-#include <sys/ioctl.h>
-#include <unistd.h>
 
 #include "pac1944.h"
 
-int open_i2c_device(const char *device)
+static int read_u32_from_file(const char *path, uint32_t *value)
 {
-    return open(device, O_RDWR);
-}
+    FILE *fp;
+    char buf[64];
+    char *endptr;
+    unsigned long tmp;
 
-void close_i2c_device(int fd)
-{
-    close(fd);
-}
-
-int i2c_set_slave(int fd, uint8_t addr)
-{
-    if (ioctl(fd, I2C_SLAVE, addr) < 0)
-    {
-        fprintf(stderr, "I2C_SLAVE 0x%02X failed: %s\n", addr, strerror(errno));
+    fp = fopen(path, "r");
+    if (!fp) {
+        fprintf(stderr, "Failed to open %s: %s\n", path, strerror(errno));
         return -1;
     }
+
+    if (!fgets(buf, sizeof(buf), fp)) {
+        fprintf(stderr, "Failed to read %s\n", path);
+        fclose(fp);
+        return -2;
+    }
+
+    fclose(fp);
+
+    errno = 0;
+    tmp = strtoul(buf, &endptr, 10);
+
+    if (errno != 0 || endptr == buf) {
+        fprintf(stderr, "Invalid numeric value in %s\n", path);
+        return -3;
+    }
+
+    *value = (uint32_t)tmp;
     return 0;
 }
 
-int pac_refresh_g(int fd)
+int pac1944_read_sysfs(const char *device_path, struct pac1944_sample *sample)
 {
-    if (i2c_set_slave(fd, 0x00) != 0)
+    char path[256];
+    uint32_t value;
+
+    if (!device_path || !sample)
         return -1;
 
-    uint8_t cmd = 0x1E;
-    if (write(fd, &cmd, 1) != 1)
-    {
-        fprintf(stderr, "REFRESH_G write failed: %s\n", strerror(errno));
+    snprintf(path, sizeof(path), "%s/vbus_raw", device_path);
+    if (read_u32_from_file(path, &value) != 0)
         return -2;
-    }
-    return 0;
-}
+    sample->vbus_raw = (uint16_t)value;
 
-int pac_read_reg(int fd, uint8_t reg, uint8_t *buf, size_t len)
-{
-    if (write(fd, &reg, 1) != 1)
-    {
-        fprintf(stderr, "Write reg 0x%02X failed: %s\n", reg, strerror(errno));
-        return -1;
-    }
+    snprintf(path, sizeof(path), "%s/vsense_raw", device_path);
+    if (read_u32_from_file(path, &value) != 0)
+        return -3;
+    sample->vsense_raw = (uint16_t)value;
 
-    int r = read(fd, buf, len);
-    if (r != (int)len)
-    {
-        fprintf(stderr, "Read reg 0x%02X failed: got %d/%zu (%s)\n",
-                reg, r, len, strerror(errno));
-        return -2;
-    }
+    snprintf(path, sizeof(path), "%s/vpower_raw", device_path);
+    if (read_u32_from_file(path, &value) != 0)
+        return -4;
+    sample->vpower_raw = value;
+
     return 0;
 }

@@ -1,14 +1,14 @@
 #ifndef PAC1944_H
 #define PAC1944_H
 
-#include <stddef.h>
 #include <stdint.h>
 
-int open_i2c_device(const char *device);
-void close_i2c_device(int fd);
+struct pac1944_sample {
+    uint16_t vbus_raw;
+    uint16_t vsense_raw;
+    uint32_t vpower_raw;
+};
 
-int i2c_set_slave(int fd, uint8_t addr);
-int pac_refresh_g(int fd);
-int pac_read_reg(int fd, uint8_t reg, uint8_t *buf, size_t len);
+int pac1944_read_sysfs(const char *device_path, struct pac1944_sample *sample);
 
 #endif

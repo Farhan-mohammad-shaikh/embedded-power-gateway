@@ -1,18 +1,16 @@
 [Unit]
-Description=Power Gateway Service
-After=network.target
+Description=Embedded Power Gateway Service
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
 ExecStart=/usr/bin/power-gateway
 Restart=on-failure
-RestartSec=5
-
-# Optional but recommended
+RestartSec=3
+WatchdogSec=10
 StandardOutput=journal
 StandardError=journal
-
-# Run as root (needed for I2C & sysfs)
 User=root
 
 [Install]
