@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -Iinclude -pthread
-LDFLAGS = -lmosquitto -pthread
+LDFLAGS = -lmosquitto -lsystemd -pthread
 
 SRC = src/main.c src/app_config.c src/led_ctrl.c src/mqtt_client.c src/pac1944.c src/logger.c
 OBJ = $(SRC:.c=.o)
